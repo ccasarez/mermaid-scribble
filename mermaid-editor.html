@@ -1,0 +1,1955 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mermaid Flow — AI Diagram Editor</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.6.1/mermaid.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-deep: #0a0a0f;
+      --bg-surface: #12121a;
+      --bg-elevated: #1a1a24;
+      --bg-hover: #22222e;
+      --border: #2a2a3a;
+      --border-focus: #4a4a6a;
+      --text-primary: #f0f0f5;
+      --text-secondary: #8888a0;
+      --text-muted: #5a5a70;
+      --accent: #6366f1;
+      --accent-hover: #818cf8;
+      --accent-glow: rgba(99, 102, 241, 0.3);
+      --success: #22c55e;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --canvas-bg: #0d0d12;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Outfit', sans-serif;
+      background: var(--bg-deep);
+      color: var(--text-primary);
+      min-height: 100vh;
+      overflow: hidden;
+    }
+
+    .app-container {
+      display: grid;
+      grid-template-columns: 1fr 360px;
+      grid-template-rows: 56px 1fr;
+      height: 100vh;
+      gap: 1px;
+      background: var(--border);
+    }
+
+    /* Header */
+    .header {
+      grid-column: 1 / -1;
+      background: var(--bg-surface);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo-icon {
+      width: 32px;
+      height: 32px;
+      background: linear-gradient(135deg, var(--accent), #a855f7);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .logo-icon svg {
+      width: 18px;
+      height: 18px;
+      stroke: white;
+      fill: none;
+      stroke-width: 2;
+    }
+
+    .logo-text {
+      font-weight: 600;
+      font-size: 18px;
+      letter-spacing: -0.02em;
+    }
+
+    .logo-text span {
+      color: var(--text-muted);
+      font-weight: 400;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      border: 1px solid transparent;
+    }
+
+    .btn svg {
+      width: 16px;
+      height: 16px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 2;
+    }
+
+    .btn-ghost {
+      background: transparent;
+      color: var(--text-secondary);
+      border-color: var(--border);
+    }
+
+    .btn-ghost:hover {
+      background: var(--bg-hover);
+      color: var(--text-primary);
+      border-color: var(--border-focus);
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: white;
+      border-color: var(--accent);
+    }
+
+    .btn-primary:hover {
+      background: var(--accent-hover);
+      border-color: var(--accent-hover);
+      box-shadow: 0 0 20px var(--accent-glow);
+    }
+
+    .btn-primary:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+
+    .btn-icon {
+      padding: 8px;
+    }
+
+    .btn-danger {
+      background: var(--danger);
+      color: white;
+      border-color: var(--danger);
+    }
+
+    /* Main Canvas Area */
+    .canvas-area {
+      background: var(--canvas-bg);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .canvas-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 2;
+    }
+
+    #drawing-canvas {
+      width: 100%;
+      height: 100%;
+    }
+
+    /* Fabric.js creates a wrapper div and canvas - make sure they're transparent */
+    .canvas-container .canvas-container {
+      background: transparent !important;
+    }
+
+    /* Mermaid Overlay */
+    .mermaid-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+      padding: 40px;
+      z-index: 1;
+    }
+
+    .mermaid-render {
+      background: white;
+      border-radius: 12px;
+      padding: 32px;
+      max-width: 90%;
+      max-height: 90%;
+      overflow: auto;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    }
+
+    .mermaid-render svg {
+      max-width: 100%;
+      height: auto;
+    }
+
+    /* Toolbar */
+    .toolbar {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 6px;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+      z-index: 10;
+    }
+
+    .toolbar-divider {
+      width: 1px;
+      height: 24px;
+      background: var(--border);
+      margin: 0 4px;
+    }
+
+    .tool-btn {
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 8px;
+      background: transparent;
+      border: none;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .tool-btn:hover {
+      background: var(--bg-hover);
+      color: var(--text-primary);
+    }
+
+    .tool-btn.active {
+      background: var(--accent);
+      color: white;
+    }
+
+    .tool-btn svg {
+      width: 20px;
+      height: 20px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 2;
+    }
+
+    .color-picker {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      border: 2px solid var(--border);
+      cursor: pointer;
+      overflow: hidden;
+    }
+
+    .color-picker::-webkit-color-swatch-wrapper {
+      padding: 0;
+    }
+
+    .color-picker::-webkit-color-swatch {
+      border: none;
+      border-radius: 50%;
+    }
+
+    .stroke-width {
+      width: 60px;
+      height: 6px;
+      -webkit-appearance: none;
+      background: var(--border);
+      border-radius: 3px;
+      cursor: pointer;
+    }
+
+    .stroke-width::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px;
+      height: 14px;
+      background: var(--accent);
+      border-radius: 50%;
+      cursor: pointer;
+    }
+
+    /* Sidebar */
+    .sidebar {
+      background: var(--bg-surface);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .sidebar-tabs {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .sidebar-tab {
+      flex: 1;
+      padding: 14px;
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+    }
+
+    .sidebar-tab:hover {
+      color: var(--text-secondary);
+    }
+
+    .sidebar-tab.active {
+      color: var(--text-primary);
+      border-bottom-color: var(--accent);
+    }
+
+    .sidebar-content {
+      flex: 1;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .tab-panel {
+      display: none;
+      flex-direction: column;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    .tab-panel.active {
+      display: flex;
+    }
+
+    /* Code Editor */
+    .code-editor-wrapper {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .code-editor {
+      flex: 1;
+      background: var(--bg-deep);
+      border: none;
+      resize: none;
+      padding: 16px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      line-height: 1.6;
+      color: var(--text-primary);
+      overflow: auto;
+    }
+
+    .code-editor:focus {
+      outline: none;
+    }
+
+    .code-actions {
+      display: flex;
+      gap: 8px;
+      padding: 12px;
+      border-top: 1px solid var(--border);
+    }
+
+    .code-actions .btn {
+      flex: 1;
+    }
+
+    /* Timeline */
+    .timeline-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px;
+    }
+
+    .timeline-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 12px;
+      background: var(--bg-elevated);
+      border-radius: 10px;
+      margin-bottom: 8px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      border: 1px solid transparent;
+    }
+
+    .timeline-item:hover {
+      border-color: var(--border-focus);
+    }
+
+    .timeline-item.active {
+      border-color: var(--accent);
+      background: rgba(99, 102, 241, 0.1);
+    }
+
+    .timeline-thumb {
+      width: 48px;
+      height: 48px;
+      background: var(--bg-deep);
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+
+    .timeline-thumb img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .timeline-thumb svg {
+      width: 20px;
+      height: 20px;
+      stroke: var(--text-muted);
+      fill: none;
+    }
+
+    .timeline-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .timeline-title {
+      font-size: 13px;
+      font-weight: 500;
+      margin-bottom: 4px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .timeline-time {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .timeline-actions {
+      display: flex;
+      gap: 4px;
+    }
+
+    .timeline-btn {
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--bg-hover);
+      border: none;
+      border-radius: 6px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .timeline-btn:hover {
+      background: var(--bg-surface);
+      color: var(--text-primary);
+    }
+
+    .timeline-btn svg {
+      width: 14px;
+      height: 14px;
+      stroke: currentColor;
+      fill: none;
+    }
+
+    /* Empty State */
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      padding: 40px;
+      text-align: center;
+    }
+
+    .empty-state svg {
+      width: 48px;
+      height: 48px;
+      stroke: var(--text-muted);
+      fill: none;
+      margin-bottom: 16px;
+      opacity: 0.5;
+    }
+
+    .empty-state h3 {
+      font-size: 15px;
+      font-weight: 500;
+      margin-bottom: 8px;
+      color: var(--text-secondary);
+    }
+
+    .empty-state p {
+      font-size: 13px;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    /* Loading State */
+    .loading-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(10, 10, 15, 0.9);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      z-index: 100;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+    }
+
+    .loading-overlay.visible {
+      opacity: 1;
+      pointer-events: all;
+    }
+
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .loading-text {
+      color: var(--text-secondary);
+      font-size: 14px;
+    }
+
+    /* Toast */
+    .toast {
+      position: fixed;
+      bottom: 100px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      padding: 12px 20px;
+      border-radius: 10px;
+      font-size: 13px;
+      color: var(--text-primary);
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.3s ease;
+      z-index: 1000;
+    }
+
+    .toast.visible {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    .toast.success {
+      border-color: var(--success);
+    }
+
+    .toast.error {
+      border-color: var(--danger);
+    }
+
+    .toast.warning {
+      border-color: var(--warning);
+    }
+
+    /* Modal */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+    }
+
+    .modal-overlay.visible {
+      opacity: 1;
+      pointer-events: all;
+    }
+
+    .modal {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      width: 90%;
+      max-width: 500px;
+      overflow: hidden;
+      transform: scale(0.95);
+      transition: transform 0.2s ease;
+    }
+
+    .modal-overlay.visible .modal {
+      transform: scale(1);
+    }
+
+    .modal-header {
+      padding: 20px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .modal-header h2 {
+      font-size: 18px;
+      font-weight: 600;
+    }
+
+    .modal-body {
+      padding: 20px;
+    }
+
+    .modal-body label {
+      display: block;
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin-bottom: 8px;
+    }
+
+    .modal-body textarea {
+      width: 100%;
+      height: 200px;
+      background: var(--bg-deep);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: var(--text-primary);
+      resize: none;
+    }
+
+    .modal-body textarea:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    .modal-footer {
+      padding: 16px 20px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+
+    /* Intro overlay */
+    .intro-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: var(--canvas-bg);
+      z-index: 50;
+      padding: 40px;
+      text-align: center;
+    }
+
+    .intro-overlay.hidden {
+      display: none;
+    }
+
+    .intro-icon {
+      width: 80px;
+      height: 80px;
+      background: linear-gradient(135deg, var(--accent), #a855f7);
+      border-radius: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 24px;
+    }
+
+    .intro-icon svg {
+      width: 40px;
+      height: 40px;
+      stroke: white;
+      fill: none;
+      stroke-width: 1.5;
+    }
+
+    .intro-overlay h2 {
+      font-size: 24px;
+      font-weight: 600;
+      margin-bottom: 12px;
+    }
+
+    .intro-overlay p {
+      font-size: 15px;
+      color: var(--text-secondary);
+      max-width: 400px;
+      line-height: 1.6;
+      margin-bottom: 32px;
+    }
+
+    .intro-steps {
+      display: flex;
+      gap: 24px;
+      margin-bottom: 32px;
+    }
+
+    .intro-step {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .intro-step-num {
+      width: 32px;
+      height: 32px;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--accent);
+    }
+
+    .intro-step span {
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+
+    /* Mode indicator badge */
+    .mode-badge {
+      display: none;
+      padding: 4px 10px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      border-radius: 4px;
+      margin-left: 12px;
+    }
+    
+    .mode-badge.mock {
+      display: inline-block;
+      background: var(--warning);
+      color: #000;
+    }
+    
+    .mode-badge.dev {
+      display: inline-block;
+      background: var(--accent);
+      color: #fff;
+    }
+  </style>
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="header">
+      <div class="logo">
+        <div class="logo-icon">
+          <svg viewBox="0 0 24 24"><path d="M12 3L3 9v12h18V9L12 3z"/><path d="M9 12h6M12 9v6"/></svg>
+        </div>
+        <div class="logo-text">Mermaid Flow <span>Editor</span><span class="mode-badge" id="modeBadge"></span></div>
+      </div>
+      <div class="header-actions">
+        <button class="btn btn-ghost" id="importBtn">
+          <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+          Import
+        </button>
+        <button class="btn btn-ghost" id="exportBtn">
+          <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+          Export
+        </button>
+        <button class="btn btn-primary" id="generateBtn">
+          <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+          Generate
+        </button>
+      </div>
+    </header>
+
+    <!-- Canvas Area -->
+    <main class="canvas-area">
+      <!-- Intro Overlay -->
+      <div class="intro-overlay" id="introOverlay">
+        <div class="intro-icon">
+          <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+        </div>
+        <h2>Create Diagrams with AI</h2>
+        <p>Draw shapes, write notes, or mark up existing diagrams. Click Generate to transform your sketches into polished Mermaid diagrams.</p>
+        <div class="intro-steps">
+          <div class="intro-step">
+            <div class="intro-step-num">1</div>
+            <span>Draw or sketch</span>
+          </div>
+          <div class="intro-step">
+            <div class="intro-step-num">2</div>
+            <span>Click Generate</span>
+          </div>
+          <div class="intro-step">
+            <div class="intro-step-num">3</div>
+            <span>Refine & iterate</span>
+          </div>
+        </div>
+        <button class="btn btn-primary" id="startBtn">
+          <svg viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          Start Drawing
+        </button>
+      </div>
+
+      <!-- Mermaid Rendered Output (BEHIND canvas) -->
+      <div class="mermaid-overlay" id="mermaidOverlay">
+        <div class="mermaid-render" id="mermaidRender"></div>
+      </div>
+
+      <!-- Drawing Canvas (ON TOP of mermaid) -->
+      <div class="canvas-container">
+        <canvas id="drawing-canvas"></canvas>
+      </div>
+
+      <!-- Toolbar -->
+      <div class="toolbar">
+        <button class="tool-btn active" data-tool="select" title="Select">
+          <svg viewBox="0 0 24 24"><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/></svg>
+        </button>
+        <button class="tool-btn" data-tool="pencil" title="Pencil">
+          <svg viewBox="0 0 24 24"><path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+        </button>
+        <button class="tool-btn" data-tool="line" title="Arrow">
+          <svg viewBox="0 0 24 24"><line x1="5" y1="19" x2="19" y2="5"/><polyline points="10 5 19 5 19 14"/></svg>
+        </button>
+        <button class="tool-btn" data-tool="rect" title="Rectangle">
+          <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+        </button>
+        <button class="tool-btn" data-tool="diamond" title="Diamond">
+          <svg viewBox="0 0 24 24"><path d="M12 2L2 12l10 10 10-10L12 2z"/></svg>
+        </button>
+        <button class="tool-btn" data-tool="ellipse" title="Ellipse">
+          <svg viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="9" ry="6"/></svg>
+        </button>
+        <button class="tool-btn" data-tool="text" title="Text">
+          <svg viewBox="0 0 24 24"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg>
+        </button>
+        <div class="toolbar-divider"></div>
+        <input type="color" class="color-picker" id="colorPicker" value="#ef4444" title="Color">
+        <input type="range" class="stroke-width" id="strokeWidth" min="1" max="10" value="3" title="Stroke Width">
+        <div class="toolbar-divider"></div>
+        <button class="tool-btn" id="undoBtn" title="Undo">
+          <svg viewBox="0 0 24 24"><path d="M3 10h10a5 5 0 015 5v2M3 10l5-5M3 10l5 5"/></svg>
+        </button>
+        <button class="tool-btn" id="resetZoomBtn" title="Reset Zoom (Fit to Screen)">
+          <svg viewBox="0 0 24 24"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
+        </button>
+        <button class="tool-btn" id="clearBtn" title="Clear Canvas">
+          <svg viewBox="0 0 24 24"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+        </button>
+      </div>
+
+      <!-- Loading Overlay -->
+      <div class="loading-overlay" id="loadingOverlay">
+        <div class="spinner"></div>
+        <div class="loading-text">Generating diagram...</div>
+      </div>
+    </main>
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-tabs">
+        <button class="sidebar-tab active" data-tab="code">Code</button>
+        <button class="sidebar-tab" data-tab="history">History</button>
+      </div>
+      <div class="sidebar-content">
+        <!-- Code Tab -->
+        <div class="tab-panel active" data-panel="code">
+          <div class="code-editor-wrapper">
+            <textarea class="code-editor" id="codeEditor" placeholder="Mermaid code will appear here...
+
+Example:
+flowchart TD
+    A[Start] --> B{Decision}
+    B -->|Yes| C[Result 1]
+    B -->|No| D[Result 2]"></textarea>
+          </div>
+          <div class="code-actions">
+            <button class="btn btn-ghost" id="applyCodeBtn">
+              <svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>
+              Apply
+            </button>
+            <button class="btn btn-ghost" id="copyCodeBtn">
+              <svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+              Copy
+            </button>
+          </div>
+        </div>
+
+        <!-- History Tab -->
+        <div class="tab-panel" data-panel="history">
+          <div class="timeline-list" id="timelineList">
+            <div class="empty-state">
+              <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+              <h3>No history yet</h3>
+              <p>Generate your first diagram to start building history.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- Import Modal -->
+  <div class="modal-overlay" id="importModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>Import Mermaid Code</h2>
+      </div>
+      <div class="modal-body">
+        <label for="importCode">Paste your Mermaid diagram code:</label>
+        <textarea id="importCode" placeholder="flowchart TD
+    A[Start] --> B[End]"></textarea>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" id="cancelImport">Cancel</button>
+        <button class="btn btn-primary" id="confirmImport">Import</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+
+  <script>
+    // Initialize Mermaid
+    mermaid.initialize({
+      startOnLoad: false,
+      theme: 'default',
+      securityLevel: 'loose'
+    });
+
+    // ===========================================
+    // LLM Backend Configuration
+    // ===========================================
+    const AppConfig = {
+      // Environment detection
+      get isArtifact() {
+        return window.location.hostname.includes('claude.ai') || 
+               window.location.hostname.includes('anthropic.com') ||
+               document.querySelector('meta[name="anthropic-artifact"]') !== null;
+      },
+      
+      get isDevMode() {
+        // Check for dev mode indicators
+        return window.MOCK_LLM === true ||
+               new URLSearchParams(location.search).get('mode') === 'dev' ||
+               window.location.hostname === 'localhost' ||
+               window.location.hostname === '127.0.0.1' ||
+               window.location.protocol === 'file:';
+      },
+      
+      get mode() {
+        if (window.MOCK_LLM === true) return 'mock';
+        if (this.isArtifact) return 'production';
+        if (this.isDevMode) return 'mock';
+        return 'production';
+      }
+    };
+
+    // ===========================================
+    // LLM Backend - Mock Implementation
+    // ===========================================
+    const MockLLMBackend = {
+      // Deterministic responses based on canvas analysis
+      responses: {
+        empty: `flowchart TD
+    A[Empty Canvas] --> B[Please draw a diagram]`,
+        
+        simpleFlow: `flowchart TD
+    A[Start] --> B[Process]
+    B --> C[End]`,
+        
+        simpleFlowWithDecision: `flowchart TD
+    A[Start] --> B{Decision}
+    B -->|Yes| C[Action 1]
+    B -->|No| D[Action 2]
+    C --> E[End]
+    D --> E`,
+        
+        multipleBoxes: `flowchart TD
+    A[Box 1] --> B[Box 2]
+    B --> C[Box 3]
+    C --> D[Box 4]`,
+        
+        withDiamond: `flowchart TD
+    A[Start] --> B{Is Valid?}
+    B -->|Yes| C[Continue]
+    B -->|No| D[Stop]`,
+        
+        sequence: `sequenceDiagram
+    participant A as User
+    participant B as System
+    A->>B: Request
+    B->>A: Response`,
+      },
+
+      // Analyze canvas to determine response
+      analyzeCanvas(imageData, canvasObjects, currentCode) {
+        const objectCount = canvasObjects?.length || 0;
+        const hasExistingCode = currentCode && currentCode.trim().length > 0;
+        
+        // Check for specific shapes
+        const hasDiamond = canvasObjects?.some(obj => obj._isDiamond) || false;
+        const hasText = canvasObjects?.some(obj => obj.type === 'i-text' || obj.text) || false;
+        const hasArrows = canvasObjects?.some(obj => obj._isArrow || obj.type === 'group') || false;
+        
+        return {
+          objectCount,
+          hasExistingCode,
+          hasDiamond,
+          hasText,
+          hasArrows,
+          isEmpty: objectCount === 0 && !hasExistingCode
+        };
+      },
+
+      // Apply mock "edits" to existing code based on annotations
+      applyAnnotations(currentCode, analysis) {
+        if (!currentCode) return this.responses.simpleFlow;
+        
+        let modifiedCode = currentCode;
+        
+        // Simulate adding a node if new shapes were drawn
+        if (analysis.objectCount > 0 && !analysis.hasExistingCode) {
+          // New drawing on existing diagram - add a node
+          const lines = modifiedCode.split('\n');
+          const lastNode = lines[lines.length - 1].match(/(\w+)\[/)?.[1] || 'Z';
+          const newNodeId = String.fromCharCode(lastNode.charCodeAt(0) + 1);
+          modifiedCode += `\n    ${lastNode} --> ${newNodeId}[New Node]`;
+        }
+        
+        // If diamond was drawn, add a decision node
+        if (analysis.hasDiamond && !modifiedCode.includes('{')) {
+          modifiedCode = modifiedCode.replace(
+            /(\w+)\[([^\]]+)\] --> (\w+)/,
+            '$1[$2] --> D{Decision}\n    D -->|Yes| $3'
+          );
+        }
+        
+        return modifiedCode;
+      },
+
+      async generate(imageData, currentCode, canvasObjects) {
+        // Simulate network delay
+        await new Promise(resolve => setTimeout(resolve, 500 + Math.random() * 500));
+        
+        const analysis = this.analyzeCanvas(imageData, canvasObjects, currentCode);
+        
+        console.log('[MockLLM] Analysis:', analysis);
+        
+        // Empty canvas
+        if (analysis.isEmpty) {
+          return this.responses.empty;
+        }
+        
+        // Has existing code - apply modifications
+        if (analysis.hasExistingCode) {
+          return this.applyAnnotations(currentCode, analysis);
+        }
+        
+        // New drawing - determine best match
+        if (analysis.hasDiamond) {
+          return this.responses.withDiamond;
+        }
+        
+        if (analysis.objectCount >= 4) {
+          return this.responses.multipleBoxes;
+        }
+        
+        if (analysis.objectCount >= 2) {
+          return this.responses.simpleFlowWithDecision;
+        }
+        
+        return this.responses.simpleFlow;
+      }
+    };
+
+    // ===========================================
+    // LLM Backend - Production Implementation
+    // ===========================================
+    const ProductionLLMBackend = {
+      async generate(imageData, currentCode) {
+        const response = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            model: 'claude-sonnet-4-6-20250217',
+            max_tokens: 4096,
+            messages: [{
+              role: 'user',
+              content: [
+                {
+                  type: 'image',
+                  source: {
+                    type: 'base64',
+                    media_type: 'image/png',
+                    data: imageData
+                  }
+                },
+                {
+                  type: 'text',
+                  text: this.buildPrompt(currentCode)
+                }
+              ]
+            }]
+          })
+        });
+
+        const data = await response.json();
+        
+        if (data.error) {
+          throw new Error(data.error.message || 'API request failed');
+        }
+        
+        let code = data.content[0].text.trim();
+        // Clean up any markdown formatting
+        code = code.replace(/^```mermaid\n?/i, '').replace(/\n?```$/i, '').trim();
+        
+        return code;
+      },
+      
+      buildPrompt(currentCode) {
+        return `You are a Mermaid diagram expert. Analyze this image which contains either:
+1. A hand-drawn sketch/wireframe that should be converted to a Mermaid diagram
+2. An existing Mermaid diagram with hand-drawn annotations/edits (like crossed-out boxes, redrawn arrows, handwritten notes, new boxes added)
+
+${currentCode ? `CURRENT MERMAID CODE (use this as your starting point and modify based on the annotations you see):
+\`\`\`
+${currentCode}
+\`\`\`
+
+` : ''}Your task:
+- If it's a sketch with no existing code: Convert it into a clean Mermaid diagram
+- If there's existing code above: Use it as your base and apply the hand-drawn annotations/edits you see in the image:
+  - Crossed-out boxes = remove those nodes
+  - Crossed-out lines/arrows = remove those connections  
+  - New drawn boxes/shapes = add new nodes
+  - Redrawn arrows = update connections
+  - Handwritten text near elements = labels or renames
+  - Comments/notes = consider as instructions for modifications
+
+CRITICAL: Respond with ONLY the Mermaid code. No explanations, no markdown code blocks, no backticks. Just the raw Mermaid syntax starting with the diagram type (flowchart, sequenceDiagram, classDiagram, etc.).
+
+If the canvas appears empty or you cannot interpret any meaningful diagram structure, respond with:
+flowchart TD
+    A[Empty Canvas] --> B[Please draw a diagram]`;
+      }
+    };
+
+    // ===========================================
+    // LLM Backend - Unified Interface
+    // ===========================================
+    const LLMBackend = {
+      async generate(imageData, currentCode, canvasObjects) {
+        const mode = AppConfig.mode;
+        console.log(`[LLMBackend] Using ${mode} mode`);
+        
+        if (mode === 'mock') {
+          return MockLLMBackend.generate(imageData, currentCode, canvasObjects);
+        } else {
+          return ProductionLLMBackend.generate(imageData, currentCode);
+        }
+      }
+    };
+
+    // Expose for testing
+    window.AppConfig = AppConfig;
+    window.LLMBackend = LLMBackend;
+    window.MockLLMBackend = MockLLMBackend;
+
+    // State
+    let canvas;
+    let currentTool = 'select';
+    let isDrawing = false;
+    let startPoint = null;
+    let activeShape = null;
+    let mermaidCode = '';
+    let history = [];
+    let currentHistoryIndex = -1;
+    let panOffsetX = 0;
+    let panOffsetY = 0;
+
+    // DOM Elements
+    const introOverlay = document.getElementById('introOverlay');
+    const startBtn = document.getElementById('startBtn');
+    const canvasEl = document.getElementById('drawing-canvas');
+    const mermaidOverlay = document.getElementById('mermaidOverlay');
+    const mermaidRender = document.getElementById('mermaidRender');
+    const loadingOverlay = document.getElementById('loadingOverlay');
+    const codeEditor = document.getElementById('codeEditor');
+    const timelineList = document.getElementById('timelineList');
+    const toast = document.getElementById('toast');
+    const colorPicker = document.getElementById('colorPicker');
+    const strokeWidth = document.getElementById('strokeWidth');
+
+    // Initialize Fabric.js Canvas
+    function initCanvas() {
+      const container = document.querySelector('.canvas-area');
+      const rect = container.getBoundingClientRect();
+      
+      canvas = new fabric.Canvas('drawing-canvas', {
+        width: rect.width,
+        height: rect.height,
+        backgroundColor: 'transparent',
+        selection: true,
+        fireRightClick: true,
+        stopContextMenu: true
+      });
+
+      canvas.freeDrawingBrush.color = colorPicker.value;
+      canvas.freeDrawingBrush.width = parseInt(strokeWidth.value);
+
+      // Handle resize
+      window.addEventListener('resize', () => {
+        const newRect = container.getBoundingClientRect();
+        canvas.setDimensions({ width: newRect.width, height: newRect.height });
+        canvas.renderAll();
+      });
+
+      // Mouse wheel zoom
+      canvas.on('mouse:wheel', function(opt) {
+        const delta = opt.e.deltaY;
+        let zoom = canvas.getZoom();
+        zoom *= 0.999 ** delta;
+        
+        // Limit zoom range
+        if (zoom > 5) zoom = 5;
+        if (zoom < 0.25) zoom = 0.25;
+        
+        // Zoom to mouse pointer position
+        canvas.zoomToPoint({ x: opt.e.offsetX, y: opt.e.offsetY }, zoom);
+        
+        // Also scale the mermaid overlay to match
+        const mermaidRenderEl = document.getElementById('mermaidRender');
+        if (mermaidRenderEl) {
+          mermaidRenderEl.style.transform = `scale(${zoom})`;
+          mermaidRenderEl.style.transformOrigin = 'center center';
+        }
+        
+        opt.e.preventDefault();
+        opt.e.stopPropagation();
+      });
+
+      // Panning with right-click drag
+      let isPanning = false;
+      let lastPosX, lastPosY;
+
+      canvas.on('mouse:down', function(opt) {
+        if (opt.button === 3) { // Fabric.js uses button 3 for right-click
+          isPanning = true;
+          canvas.selection = false;
+          lastPosX = opt.e.clientX;
+          lastPosY = opt.e.clientY;
+          canvas.defaultCursor = 'grabbing';
+          canvas.setCursor('grabbing');
+        }
+      });
+
+      canvas.on('mouse:move', function(opt) {
+        if (isPanning) {
+          const deltaX = opt.e.clientX - lastPosX;
+          const deltaY = opt.e.clientY - lastPosY;
+          
+          const vpt = canvas.viewportTransform;
+          vpt[4] += deltaX;
+          vpt[5] += deltaY;
+          canvas.requestRenderAll();
+          
+          // Track cumulative pan offset for overlay
+          panOffsetX += deltaX;
+          panOffsetY += deltaY;
+          
+          lastPosX = opt.e.clientX;
+          lastPosY = opt.e.clientY;
+          
+          // Move mermaid overlay to match
+          const mermaidOverlayEl = document.getElementById('mermaidOverlay');
+          if (mermaidOverlayEl) {
+            mermaidOverlayEl.style.transform = `translate(${panOffsetX}px, ${panOffsetY}px)`;
+          }
+        }
+      });
+
+      canvas.on('mouse:up', function(opt) {
+        if (isPanning) {
+          isPanning = false;
+          canvas.selection = true;
+          canvas.defaultCursor = 'default';
+          canvas.setCursor('default');
+        }
+      });
+
+      // Canvas events for shape drawing
+      canvas.on('mouse:down', handleMouseDown);
+      canvas.on('mouse:move', handleMouseMove);
+      canvas.on('mouse:up', handleMouseUp);
+    }
+
+    function handleMouseDown(opt) {
+      if (currentTool === 'select' || currentTool === 'pencil') return;
+      
+      // For text tool, create text at click position
+      if (currentTool === 'text') {
+        const pointer = canvas.getPointer(opt.e);
+        const color = colorPicker.value;
+        const text = new fabric.IText('Type here', {
+          left: pointer.x,
+          top: pointer.y,
+          fontSize: 20,
+          fill: color,
+          fontFamily: 'Outfit',
+          fontWeight: '500'
+        });
+        canvas.add(text);
+        canvas.setActiveObject(text);
+        text.enterEditing();
+        text.selectAll();
+        return;
+      }
+      
+      isDrawing = true;
+      const pointer = canvas.getPointer(opt.e);
+      startPoint = { x: pointer.x, y: pointer.y };
+
+      const color = colorPicker.value;
+      const width = parseInt(strokeWidth.value);
+
+      if (currentTool === 'line') {
+        // Create arrow line using a group with line + triangle
+        activeShape = new fabric.Line([pointer.x, pointer.y, pointer.x, pointer.y], {
+          stroke: color,
+          strokeWidth: width,
+          selectable: true,
+          originX: 'center',
+          originY: 'center'
+        });
+        activeShape._isArrow = true; // Mark as arrow for later
+      } else if (currentTool === 'rect') {
+        activeShape = new fabric.Rect({
+          left: pointer.x,
+          top: pointer.y,
+          width: 0,
+          height: 0,
+          fill: 'transparent',
+          stroke: color,
+          strokeWidth: width
+        });
+      } else if (currentTool === 'diamond') {
+        // Diamond is a polygon with 4 points
+        activeShape = new fabric.Polygon([
+          { x: 0, y: 0 },
+          { x: 0, y: 0 },
+          { x: 0, y: 0 },
+          { x: 0, y: 0 }
+        ], {
+          left: pointer.x,
+          top: pointer.y,
+          fill: 'transparent',
+          stroke: color,
+          strokeWidth: width,
+          objectCaching: false
+        });
+        activeShape._isDiamond = true;
+      } else if (currentTool === 'ellipse') {
+        activeShape = new fabric.Ellipse({
+          left: pointer.x,
+          top: pointer.y,
+          rx: 0,
+          ry: 0,
+          fill: 'transparent',
+          stroke: color,
+          strokeWidth: width
+        });
+      }
+
+      if (activeShape) {
+        canvas.add(activeShape);
+      }
+    }
+
+    function handleMouseMove(opt) {
+      if (!isDrawing || !activeShape) return;
+      
+      const pointer = canvas.getPointer(opt.e);
+
+      if (currentTool === 'line') {
+        activeShape.set({ x2: pointer.x, y2: pointer.y });
+      } else if (currentTool === 'rect') {
+        const width = pointer.x - startPoint.x;
+        const height = pointer.y - startPoint.y;
+        activeShape.set({
+          width: Math.abs(width),
+          height: Math.abs(height),
+          left: width > 0 ? startPoint.x : pointer.x,
+          top: height > 0 ? startPoint.y : pointer.y
+        });
+      } else if (currentTool === 'diamond') {
+        // Update diamond points based on drag
+        const w = Math.abs(pointer.x - startPoint.x);
+        const h = Math.abs(pointer.y - startPoint.y);
+        const left = Math.min(startPoint.x, pointer.x);
+        const top = Math.min(startPoint.y, pointer.y);
+        
+        // Remove old shape and create new one with correct points
+        canvas.remove(activeShape);
+        
+        // Diamond points: top, right, bottom, left (centered in bounding box)
+        const points = [
+          { x: w / 2, y: 0 },       // top
+          { x: w, y: h / 2 },       // right
+          { x: w / 2, y: h },       // bottom
+          { x: 0, y: h / 2 }        // left
+        ];
+        
+        const color = colorPicker.value;
+        const strokeW = parseInt(strokeWidth.value);
+        
+        activeShape = new fabric.Polygon(points, {
+          left: left,
+          top: top,
+          fill: 'transparent',
+          stroke: color,
+          strokeWidth: strokeW,
+          objectCaching: false
+        });
+        activeShape._isDiamond = true;
+        canvas.add(activeShape);
+      } else if (currentTool === 'ellipse') {
+        const rx = Math.abs(pointer.x - startPoint.x) / 2;
+        const ry = Math.abs(pointer.y - startPoint.y) / 2;
+        activeShape.set({
+          rx: rx,
+          ry: ry,
+          left: Math.min(startPoint.x, pointer.x),
+          top: Math.min(startPoint.y, pointer.y)
+        });
+      }
+
+      canvas.renderAll();
+    }
+
+    function handleMouseUp() {
+      // If we drew a line marked as arrow, convert it to an arrow with arrowhead
+      if (activeShape && activeShape._isArrow) {
+        const line = activeShape;
+        const x1 = line.x1, y1 = line.y1, x2 = line.x2, y2 = line.y2;
+        const color = line.stroke;
+        const strokeW = line.strokeWidth;
+        
+        // Calculate angle for arrowhead
+        const angle = Math.atan2(y2 - y1, x2 - x1);
+        const headLength = 12 + strokeW * 2;
+        
+        // Arrowhead points
+        const arrowHead = new fabric.Triangle({
+          left: x2,
+          top: y2,
+          width: headLength,
+          height: headLength,
+          fill: color,
+          angle: (angle * 180 / Math.PI) + 90,
+          originX: 'center',
+          originY: 'center',
+          selectable: false
+        });
+        
+        // Group line and arrowhead
+        canvas.remove(line);
+        const arrow = new fabric.Group([
+          new fabric.Line([x1, y1, x2, y2], {
+            stroke: color,
+            strokeWidth: strokeW,
+            originX: 'center',
+            originY: 'center'
+          }),
+          arrowHead
+        ], {
+          selectable: true
+        });
+        canvas.add(arrow);
+      }
+      
+      isDrawing = false;
+      activeShape = null;
+      canvas.renderAll();
+    }
+
+    // Delete key handler
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        const activeObj = canvas.getActiveObject();
+        if (activeObj && !activeObj.isEditing) {
+          // Don't delete if editing text
+          canvas.remove(activeObj);
+          canvas.discardActiveObject();
+          canvas.renderAll();
+        }
+      }
+    });
+
+    // Tool selection
+    document.querySelectorAll('.tool-btn[data-tool]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.tool-btn[data-tool]').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentTool = btn.dataset.tool;
+
+        if (currentTool === 'pencil') {
+          canvas.isDrawingMode = true;
+        } else {
+          canvas.isDrawingMode = false;
+        }
+
+        if (currentTool === 'select') {
+          canvas.selection = true;
+        }
+      });
+    });
+
+    // Color and stroke
+    colorPicker.addEventListener('input', (e) => {
+      canvas.freeDrawingBrush.color = e.target.value;
+    });
+
+    strokeWidth.addEventListener('input', (e) => {
+      canvas.freeDrawingBrush.width = parseInt(e.target.value);
+    });
+
+    // Clear canvas
+    document.getElementById('clearBtn').addEventListener('click', () => {
+      canvas.clear();
+      canvas.backgroundColor = '#0d0d12';
+      canvas.renderAll();
+      mermaidRender.innerHTML = '';
+    });
+
+    // Undo
+    document.getElementById('undoBtn').addEventListener('click', () => {
+      const objects = canvas.getObjects();
+      if (objects.length > 0) {
+        canvas.remove(objects[objects.length - 1]);
+        canvas.renderAll();
+      }
+    });
+
+    // Reset Zoom
+    document.getElementById('resetZoomBtn').addEventListener('click', () => {
+      canvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
+      canvas.renderAll();
+      
+      // Reset pan offsets
+      panOffsetX = 0;
+      panOffsetY = 0;
+      
+      // Reset mermaid overlay transform
+      const mermaidOverlayEl = document.getElementById('mermaidOverlay');
+      const mermaidRenderEl = document.getElementById('mermaidRender');
+      if (mermaidOverlayEl) {
+        mermaidOverlayEl.style.transform = '';
+      }
+      if (mermaidRenderEl) {
+        mermaidRenderEl.style.transform = '';
+      }
+    });
+
+    // Tab switching
+    document.querySelectorAll('.sidebar-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.sidebar-tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+        tab.classList.add('active');
+        document.querySelector(`[data-panel="${tab.dataset.tab}"]`).classList.add('active');
+      });
+    });
+
+    // Generate diagram
+    document.getElementById('generateBtn').addEventListener('click', async () => {
+      // Hide intro if visible
+      introOverlay.classList.add('hidden');
+      
+      // Create a composite image of mermaid + annotations
+      const captureCanvas = document.createElement('canvas');
+      captureCanvas.width = canvas.width;
+      captureCanvas.height = canvas.height;
+      const ctx = captureCanvas.getContext('2d');
+      
+      // Fill with white background
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, captureCanvas.width, captureCanvas.height);
+      
+      // If there's a mermaid diagram rendered, draw it first
+      const mermaidSvg = mermaidRender.querySelector('svg');
+      if (mermaidSvg && mermaidRender.innerHTML.trim() !== '') {
+        // Get the mermaid render position (it's centered in the overlay)
+        const renderRect = mermaidRender.getBoundingClientRect();
+        const canvasRect = document.querySelector('.canvas-area').getBoundingClientRect();
+        
+        // Calculate offset
+        const offsetX = renderRect.left - canvasRect.left;
+        const offsetY = renderRect.top - canvasRect.top;
+        
+        // Draw the mermaid container background
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(offsetX, offsetY, renderRect.width, renderRect.height);
+        
+        // Convert SVG to image and draw
+        const svgClone = mermaidSvg.cloneNode(true);
+        svgClone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+        const svgString = new XMLSerializer().serializeToString(svgClone);
+        const svgBase64 = btoa(unescape(encodeURIComponent(svgString)));
+        
+        await new Promise((resolve) => {
+          const img = new Image();
+          img.onload = () => {
+            ctx.drawImage(img, offsetX + 32, offsetY + 32); // Account for padding
+            resolve();
+          };
+          img.onerror = resolve;
+          img.src = 'data:image/svg+xml;base64,' + svgBase64;
+        });
+      }
+      
+      // Now draw the fabric canvas (user annotations) on top
+      const fabricDataUrl = canvas.toDataURL({ format: 'png' });
+      await new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+          ctx.drawImage(img, 0, 0);
+          resolve();
+        };
+        img.onerror = resolve;
+        img.src = fabricDataUrl;
+      });
+      
+      // Get final composite image
+      const dataUrl = captureCanvas.toDataURL('image/png');
+      const imageBase64 = dataUrl.split(',')[1];
+      
+      // Show loading
+      loadingOverlay.classList.add('visible');
+      
+      // Log mode for debugging
+      console.log(`[Generate] Mode: ${AppConfig.mode}, Objects: ${canvas.getObjects().length}`);
+      
+      try {
+        // Use unified LLM backend (mock or production based on environment)
+        const code = await LLMBackend.generate(
+          imageBase64,
+          mermaidCode,
+          canvas.getObjects()
+        );
+        
+        mermaidCode = code;
+        codeEditor.value = code;
+        
+        // Render mermaid diagram
+        await renderMermaid(code);
+        
+        // Save to history
+        saveToHistory(code, dataUrl);
+        
+        const modeLabel = AppConfig.mode === 'mock' ? ' (mock)' : '';
+        showToast(`Diagram generated successfully!${modeLabel}`, 'success');
+      } catch (error) {
+        console.error('Error:', error);
+        showToast('Failed to generate diagram. ' + (error.message || 'Please try again.'), 'error');
+      } finally {
+        loadingOverlay.classList.remove('visible');
+      }
+    });
+
+    // Render Mermaid diagram
+    async function renderMermaid(code) {
+      try {
+        // Always hide intro when rendering a diagram
+        introOverlay.classList.add('hidden');
+        
+        mermaidRender.innerHTML = '';
+        const { svg } = await mermaid.render('mermaid-svg-' + Date.now(), code);
+        mermaidRender.innerHTML = svg;
+        
+        // Clear canvas but keep transparent so mermaid overlay shows through
+        canvas.clear();
+        canvas.backgroundColor = 'transparent';
+        canvas.renderAll();
+        
+        // Make sure mermaid overlay is visible
+        mermaidOverlay.style.display = 'flex';
+        
+      } catch (error) {
+        console.error('Mermaid render error:', error);
+        showToast('Syntax error: ' + (error.message || 'Invalid diagram'), 'error');
+      }
+    }
+
+    // Save to history
+    function saveToHistory(code, thumbnail) {
+      const entry = {
+        id: Date.now(),
+        code: code,
+        thumbnail: thumbnail,
+        timestamp: new Date()
+      };
+      
+      history.push(entry);
+      currentHistoryIndex = history.length - 1;
+      updateHistoryUI();
+    }
+
+    // Update history UI
+    function updateHistoryUI() {
+      if (history.length === 0) {
+        timelineList.innerHTML = `
+          <div class="empty-state">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+            <h3>No history yet</h3>
+            <p>Generate your first diagram to start building history.</p>
+          </div>
+        `;
+        return;
+      }
+
+      timelineList.innerHTML = history.map((entry, index) => `
+        <div class="timeline-item ${index === currentHistoryIndex ? 'active' : ''}" data-index="${index}">
+          <div class="timeline-thumb">
+            <img src="${entry.thumbnail}" alt="Snapshot">
+          </div>
+          <div class="timeline-info">
+            <div class="timeline-title">Version ${index + 1}</div>
+            <div class="timeline-time">${formatTime(entry.timestamp)}</div>
+          </div>
+          <div class="timeline-actions">
+            <button class="timeline-btn restore-btn" title="Restore">
+              <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 109-9 9.75 9.75 0 00-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+            </button>
+          </div>
+        </div>
+      `).reverse().join('');
+
+      // Add restore handlers
+      document.querySelectorAll('.timeline-item').forEach(item => {
+        item.addEventListener('click', (e) => {
+          if (e.target.closest('.restore-btn')) {
+            const index = parseInt(item.dataset.index);
+            restoreFromHistory(index);
+          }
+        });
+      });
+    }
+
+    function formatTime(date) {
+      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+
+    function restoreFromHistory(index) {
+      const entry = history[index];
+      if (!entry) return;
+      
+      currentHistoryIndex = index;
+      mermaidCode = entry.code;
+      codeEditor.value = entry.code;
+      renderMermaid(entry.code);
+      updateHistoryUI();
+      showToast('Restored from history', 'success');
+    }
+
+    // Apply code from editor
+    document.getElementById('applyCodeBtn').addEventListener('click', () => {
+      const code = codeEditor.value.trim();
+      if (code) {
+        introOverlay.classList.add('hidden');
+        mermaidCode = code;
+        renderMermaid(code);
+        saveToHistory(code, canvas.toDataURL());
+      }
+    });
+
+    // Copy code
+    document.getElementById('copyCodeBtn').addEventListener('click', () => {
+      navigator.clipboard.writeText(codeEditor.value);
+      showToast('Code copied to clipboard', 'success');
+    });
+
+    // Import modal
+    const importModal = document.getElementById('importModal');
+    
+    document.getElementById('importBtn').addEventListener('click', () => {
+      importModal.classList.add('visible');
+    });
+
+    document.getElementById('cancelImport').addEventListener('click', () => {
+      importModal.classList.remove('visible');
+    });
+
+    document.getElementById('confirmImport').addEventListener('click', () => {
+      const code = document.getElementById('importCode').value.trim();
+      if (code) {
+        mermaidCode = code;
+        codeEditor.value = code;
+        renderMermaid(code);
+        introOverlay.classList.add('hidden');
+        importModal.classList.remove('visible');
+        showToast('Diagram imported', 'success');
+      }
+    });
+
+    // Export
+    document.getElementById('exportBtn').addEventListener('click', () => {
+      const code = codeEditor.value || mermaidCode;
+      if (!code) {
+        showToast('No diagram to export', 'error');
+        return;
+      }
+      
+      const blob = new Blob([code], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'diagram.mmd';
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast('Diagram exported', 'success');
+    });
+
+    // Start button
+    startBtn.addEventListener('click', () => {
+      introOverlay.classList.add('hidden');
+    });
+
+    // Toast
+    function showToast(message, type = 'info') {
+      toast.textContent = message;
+      toast.className = 'toast visible ' + type;
+      setTimeout(() => {
+        toast.classList.remove('visible');
+      }, 3000);
+    }
+
+    // Close modal on outside click
+    importModal.addEventListener('click', (e) => {
+      if (e.target === importModal) {
+        importModal.classList.remove('visible');
+      }
+    });
+
+    // Initialize mode badge
+    function updateModeBadge() {
+      const badge = document.getElementById('modeBadge');
+      const mode = AppConfig.mode;
+      
+      if (mode === 'mock') {
+        badge.textContent = 'Mock';
+        badge.className = 'mode-badge mock';
+      } else if (AppConfig.isDevMode) {
+        badge.textContent = 'Dev';
+        badge.className = 'mode-badge dev';
+      } else {
+        badge.className = 'mode-badge';
+      }
+      
+      console.log(`[App] Running in ${mode} mode`);
+    }
+
+    // Initialize
+    initCanvas();
+    updateModeBadge();
+    
+    // Expose for external control (testing, dev tools)
+    window.MermaidEditor = {
+      getConfig: () => AppConfig,
+      getCanvas: () => canvas,
+      getMermaidCode: () => mermaidCode,
+      setMockMode: (enabled) => {
+        window.MOCK_LLM = enabled;
+        updateModeBadge();
+      },
+      generate: () => document.getElementById('generateBtn').click(),
+      import: (code) => {
+        codeEditor.value = code;
+        document.getElementById('applyCodeBtn').click();
+      }
+    };
+  </script>
+</body>
+</html>
