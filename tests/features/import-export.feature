@@ -34,9 +34,3 @@ Feature: Import and Export Mermaid Code
     And the code editor is empty
     When I click the "Export" button in the header
     Then I should see an error toast
-
-  Scenario: Copy code to clipboard
-    Given the application is loaded
-    And the code editor contains Mermaid code
-    When I click the "Copy" button
-    Then I should see a success toast saying "Code copied to clipboard"

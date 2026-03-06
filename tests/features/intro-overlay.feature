@@ -22,10 +22,3 @@ Feature: Intro Overlay
     And I enter valid Mermaid code
     And I confirm the import
     Then the intro overlay should be hidden
-
-  Scenario: Dismiss intro by applying code from editor
-    Given the application is loaded
-    And the intro overlay is visible
-    When I enter Mermaid code in the editor
-    And I click the "Apply" button
-    Then the intro overlay should be hidden

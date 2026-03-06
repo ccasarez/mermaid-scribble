@@ -8,10 +8,10 @@ Feature: Drawing Tools
     And I dismiss the intro overlay
     Then the Select tool should be active by default
 
-  Scenario: Available drawing tools
+  Scenario: Available drawing tools in vertical toolbar
     Given the application is loaded
     And I dismiss the intro overlay
-    Then I should see the following tools in the toolbar:
+    Then I should see the following tools in the vertical toolbar:
       | tool     |
       | select   |
       | pencil   |

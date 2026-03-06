@@ -14,7 +14,6 @@ Feature: Application Layout
     Then the header should display the logo "Mermaid Flow"
     And the header should have an "Import" button
     And the header should have an "Export" button
-    And the header should have a "Generate" button
 
   Scenario: Sidebar has tabbed interface
     Given the application is loaded
@@ -23,7 +22,12 @@ Feature: Application Layout
     And the "Code" tab should be active by default
     And the Code panel should contain a code editor
 
-  Scenario: Toolbar is visible
+  Scenario: Vertical toolbar is visible on the left
     Given the application is loaded
     And I dismiss the intro overlay
-    Then I should see a floating toolbar at the bottom of the canvas
+    Then I should see a vertical toolbar on the left side of the canvas area
+
+  Scenario: Chat input is visible at the bottom
+    Given the application is loaded
+    And I dismiss the intro overlay
+    Then I should see a chat input area at the bottom of the canvas area
